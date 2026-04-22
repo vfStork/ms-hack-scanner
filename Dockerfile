@@ -1,10 +1,10 @@
-FROM python:3.12-slim
+FROM --platform=linux/amd64 python:3.11-slim
 
 WORKDIR /app
 
 # System deps for Open3D headless
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1-mesa-glx libglib2.0-0 libgomp1 \
+    libgl1 libglib2.0-0 libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
