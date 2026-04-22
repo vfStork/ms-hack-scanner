@@ -1,0 +1,18 @@
+# Data
+twins/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Environment
+.env
+
+# IDE
+.idea/
+*.swp
+*.swo
+.DS_Store
