@@ -21,7 +21,7 @@ az acr login --name vfhackteam4acr
 ### 2. Build the Docker image
 
 ```bash
-docker build -t vfhackteam4acr.azurecr.io/ms-hack-scanner:latest .
+docker build --no-cache --network=host -t vfhackteam4acr.azurecr.io/ms-hack-scanner:latest .
 ```
 
 ### 3. Push the image to ACR
