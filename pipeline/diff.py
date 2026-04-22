@@ -79,7 +79,7 @@ def compute_diff(
         volume_a=vol_a,
         volume_b=vol_b,
         volume_delta=vol_b - vol_a,
-        bbox_a=(bbox_b.max_bound - bbox_a.min_bound).tolist(),
+        bbox_a=(bbox_a.max_bound - bbox_a.min_bound).tolist(),
         bbox_b=(bbox_b.max_bound - bbox_b.min_bound).tolist(),
         per_vertex_distances=dists_a.tolist(),
     )
