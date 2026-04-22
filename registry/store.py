@@ -36,13 +36,14 @@ def _load(twin_id: str) -> Twin:
 
 
 def register_twin(name: str, raw_ply_path: str) -> Twin:
-    """Create a new twin from a raw scan. Stores raw .ply + .glb."""
+    """Create a new twin from a raw scan. Stores raw mesh + .glb."""
     twin_id = str(uuid.uuid4())
     d = _twin_dir(twin_id)
     d.mkdir(parents=True, exist_ok=True)
 
-    # Copy raw PLY
-    dest_ply = str(d / "v1_raw.ply")
+    # Copy raw mesh, preserving original extension
+    ext = Path(raw_ply_path).suffix or ".ply"
+    dest_ply = str(d / f"v1_raw{ext}")
     shutil.copy2(raw_ply_path, dest_ply)
 
     # Export raw GLB for viewer
@@ -68,7 +69,8 @@ def add_version(twin_id: str, raw_ply_path: str) -> Twin:
     v_num = len(twin.versions) + 1
     d = _twin_dir(twin_id)
 
-    dest_ply = str(d / f"v{v_num}_raw.ply")
+    ext = Path(raw_ply_path).suffix or ".ply"
+    dest_ply = str(d / f"v{v_num}_raw{ext}")
     shutil.copy2(raw_ply_path, dest_ply)
 
     mesh = load_scan(dest_ply)
