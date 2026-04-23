@@ -497,6 +497,14 @@ $btnWireframe.onclick = () => {
 $btnInfo.onclick = () => $infoPanel.classList.toggle("visible");
 $btnCloseInfo.onclick = () => $infoPanel.classList.remove("visible");
 
+// ── Sidebar toggle ────────────────────────────────────────────────────
+const $sidebar           = document.getElementById("sidebar");
+const $btnSidebarToggle  = document.getElementById("btn-sidebar-toggle");
+$btnSidebarToggle.onclick = () => {
+  const collapsed = $sidebar.classList.toggle("collapsed");
+  $btnSidebarToggle.title = collapsed ? "Expand sidebar" : "Collapse sidebar";
+};
+
 // ── Modal helpers ─────────────────────────────────────────────────────
 function openModal(modal) { modal.classList.add("open"); }
 function closeModal(modal) { modal.classList.remove("open"); }
