@@ -4,17 +4,16 @@ import json
 import os
 import numpy as np
 import open3d as o3d
-from openai import AzureOpenAI
+from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
 
 
-def _get_client() -> AzureOpenAI:
-    return AzureOpenAI(
-        azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
+def _get_client() -> OpenAI:
+    return OpenAI(
+        base_url=os.environ["AZURE_OPENAI_ENDPOINT"],
         api_key=os.environ["AZURE_OPENAI_KEY"],
-        api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21"),
     )
 
 
@@ -76,7 +75,7 @@ def enrich_twin(mesh: o3d.geometry.TriangleMesh) -> dict:
             },
         ],
         temperature=0.2,
-        max_tokens=300,
+        max_completion_tokens=300,
         response_format={"type": "json_object"},
     )
 

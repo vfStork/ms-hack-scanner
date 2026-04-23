@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-from openai import AzureOpenAI
+from openai import OpenAI
 from dotenv import load_dotenv
 
 from pipeline.diff import DiffResult
@@ -10,11 +10,10 @@ from pipeline.diff import DiffResult
 load_dotenv()
 
 
-def _get_client() -> AzureOpenAI:
-    return AzureOpenAI(
-        azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
+def _get_client() -> OpenAI:
+    return OpenAI(
+        base_url=os.environ["AZURE_OPENAI_ENDPOINT"],
         api_key=os.environ["AZURE_OPENAI_KEY"],
-        api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21"),
     )
 
 
@@ -51,7 +50,7 @@ def describe_changes(diff: DiffResult, twin_metadata: dict) -> str:
             },
         ],
         temperature=0.3,
-        max_tokens=200,
+        max_completion_tokens=200,
     )
 
     return response.choices[0].message.content.strip()
