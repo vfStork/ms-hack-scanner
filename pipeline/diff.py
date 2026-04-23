@@ -12,6 +12,10 @@ class DiffResult:
     mean_distance: float = 0.0
     max_distance: float = 0.0
     std_distance: float = 0.0
+    p90_distance: float = 0.0
+    p95_distance: float = 0.0
+    alignment_fitness: float = 0.0
+    alignment_rmse: float = 0.0
     volume_a: float = 0.0
     volume_b: float = 0.0
     volume_delta: float = 0.0
@@ -24,6 +28,10 @@ class DiffResult:
             "mean_distance": round(self.mean_distance, 6),
             "max_distance": round(self.max_distance, 6),
             "std_distance": round(self.std_distance, 6),
+            "p90_distance": round(self.p90_distance, 6),
+            "p95_distance": round(self.p95_distance, 6),
+            "alignment_fitness": round(self.alignment_fitness, 6),
+            "alignment_rmse": round(self.alignment_rmse, 6),
             "volume_a": round(self.volume_a, 6),
             "volume_b": round(self.volume_b, 6),
             "volume_delta": round(self.volume_delta, 6),
@@ -72,10 +80,17 @@ def compute_diff(
     bbox_a = mesh_a.get_axis_aligned_bounding_box()
     bbox_b = mesh_b_aligned.get_axis_aligned_bounding_box()
 
+    p90 = float(np.percentile(all_dists, 90))
+    p95 = float(np.percentile(all_dists, 95))
+
     return DiffResult(
         mean_distance=float(np.mean(all_dists)),
         max_distance=float(np.max(all_dists)),
         std_distance=float(np.std(all_dists)),
+        p90_distance=p90,
+        p95_distance=p95,
+        alignment_fitness=float(reg.fitness),
+        alignment_rmse=float(reg.inlier_rmse),
         volume_a=vol_a,
         volume_b=vol_b,
         volume_delta=vol_b - vol_a,
@@ -89,7 +104,7 @@ def export_diff_glb(
     mesh: o3d.geometry.TriangleMesh,
     distances: list[float],
     output_path: str,
-) -> str:
+) -> tuple[str, o3d.geometry.TriangleMesh]:
     """Bake per-vertex distance heatmap into vertex colors and export GLB."""
     import matplotlib.cm as cm
 
@@ -112,4 +127,4 @@ def export_diff_glb(
     colored_mesh = o3d.geometry.TriangleMesh(mesh)
     colored_mesh.vertex_colors = o3d.utility.Vector3dVector(colors_rgb[:n_verts])
 
-    return export_glb(colored_mesh, output_path)
+    return export_glb(colored_mesh, output_path), colored_mesh

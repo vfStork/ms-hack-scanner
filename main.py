@@ -108,10 +108,14 @@ def cmd_compare(args):
     diff = compute_diff(mesh_a, mesh_b)
 
     heatmap_path = str(_twin_dir(args.twin_id) / f"diff_v{args.v1}_v{args.v2}.glb")
-    export_diff_glb(mesh_a, diff.per_vertex_distances, heatmap_path)
+    _, heatmap_mesh = export_diff_glb(mesh_a, diff.per_vertex_distances, heatmap_path)
+
+    base_img_path = heatmap_path.replace(".glb", "")
+    from pipeline.render import generate_diff_snapshots
+    img_paths = generate_diff_snapshots(heatmap_mesh, base_img_path)
 
     print("Generating AI description…")
-    description = describe_changes(diff, twin.metadata)
+    description = describe_changes(diff, twin.metadata, img_paths)
 
     add_changelog(args.twin_id, args.v1, args.v2, description, diff.to_dict(), heatmap_path)
 

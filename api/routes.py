@@ -182,10 +182,14 @@ async def compare(req: CompareRequest):
     heatmap_path = str(
         twin_dir / f"diff_v{req.version_a}_v{req.version_b}.glb"
     )
-    export_diff_glb(mesh_a, diff_result.per_vertex_distances, heatmap_path)
+    _, heatmap_mesh = export_diff_glb(mesh_a, diff_result.per_vertex_distances, heatmap_path)
+
+    base_img_path = heatmap_path.replace(".glb", "")
+    from pipeline.render import generate_diff_snapshots
+    img_paths = generate_diff_snapshots(heatmap_mesh, base_img_path)
 
     # AI description
-    description = describe_changes(diff_result, twin.metadata)
+    description = describe_changes(diff_result, twin.metadata, img_paths)
 
     # Store in changelog
     twin = store.add_changelog(
