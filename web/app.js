@@ -38,6 +38,7 @@ const $loadingTitle  = document.getElementById("loading-title");
 const $loadingStep   = document.getElementById("loading-step");
 const $modalUpload   = document.getElementById("modal-upload");
 const $modalCompare  = document.getElementById("modal-compare");
+const $modalDelete   = document.getElementById("modal-delete");
 const $nameInput     = document.getElementById("twin-name-input");
 const $cmpVa         = document.getElementById("cmp-va");
 const $cmpVb         = document.getElementById("cmp-vb");
@@ -124,7 +125,10 @@ function renderList() {
     const el = document.createElement("div");
     el.className = "twin-item" + (t.id === activeTwinId ? " active" : "");
     el.innerHTML = `
-      <div class="twin-item-name">${esc(t.name)}</div>
+      <div class="twin-item-header">
+        <div class="twin-item-name">${esc(t.name)}</div>
+        <button class="btn-delete-twin" title="Delete twin" data-id="${t.id}" data-name="${esc(t.name)}">🗑</button>
+      </div>
       <div class="twin-item-meta">
         <span>${t.versions.length} version${t.versions.length !== 1 ? "s" : ""}</span>
         <span style="color:var(--border-light)">·</span>
@@ -132,10 +136,55 @@ function renderList() {
         ${badges}
       </div>
     `;
-    el.onclick = () => selectTwin(t.id);
+    el.onclick = (e) => {
+      if (e.target.closest(".btn-delete-twin")) return;
+      selectTwin(t.id);
+    };
+    el.querySelector(".btn-delete-twin").onclick = (e) => {
+      e.stopPropagation();
+      confirmDeleteTwin(t.id, t.name);
+    };
     $list.appendChild(el);
   }
 }
+
+// ── Delete twin ───────────────────────────────────────────────────────
+let pendingDeleteId = null;
+
+function confirmDeleteTwin(id, name) {
+  pendingDeleteId = id;
+  document.getElementById("modal-delete-msg").textContent =
+    `Are you sure you want to delete "${name}"? This will permanently remove the twin and all its scan files.`;
+  openModal($modalDelete);
+}
+
+document.getElementById("modal-delete-confirm").onclick = async () => {
+  if (!pendingDeleteId) return;
+  closeModal($modalDelete);
+  const idToDelete = pendingDeleteId;
+  pendingDeleteId = null;
+
+  loading(true, "Deleting twin…", "Removing files");
+  try {
+    await api(`/api/twins/${idToDelete}`, { method: "DELETE" });
+    if (activeTwinId === idToDelete) {
+      activeTwinId = null;
+      activeVersion = null;
+      setEmptyState(true);
+    }
+    await refreshList();
+    toast("Twin deleted", "success");
+  } catch (e) {
+    toast("Delete failed: " + e.message, "error");
+  } finally {
+    loading(false);
+  }
+};
+
+document.getElementById("modal-delete-cancel").onclick = () => {
+  closeModal($modalDelete);
+  pendingDeleteId = null;
+};
 
 // ── Select twin ───────────────────────────────────────────────────────
 async function selectTwin(id) {

@@ -162,6 +162,13 @@ def update_metadata(twin_id: str, metadata: dict) -> Twin:
     return twin
 
 
+def delete_twin(twin_id: str) -> None:
+    """Delete a twin and all its associated files from disk."""
+    twin = _load(twin_id)  # raises FileNotFoundError if missing
+    twin_dir = _twin_dir(twin_id)
+    shutil.rmtree(twin_dir)
+
+
 def get_twin(twin_id: str) -> Twin:
     return _load(twin_id)
 

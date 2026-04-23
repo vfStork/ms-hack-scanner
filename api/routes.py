@@ -220,6 +220,16 @@ async def get_twin(twin_id: str):
         raise HTTPException(404, "Twin not found")
 
 
+@router.delete("/twins/{twin_id}")
+async def delete_twin(twin_id: str):
+    """Delete a twin and all associated scan files."""
+    try:
+        store.delete_twin(twin_id)
+    except FileNotFoundError:
+        raise HTTPException(404, "Twin not found")
+    return {"deleted": twin_id}
+
+
 # ── Serve model files ────────────────────────────────────────────────
 
 @router.get("/twins/{twin_id}/versions/{version}/model")
