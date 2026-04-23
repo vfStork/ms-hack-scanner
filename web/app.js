@@ -207,6 +207,7 @@ async function selectTwin(id) {
   $btnCompare.disabled  = twin.versions.length < 2;
   $btnWireframe.disabled = false;
 
+  updateVariantOptions(twin, latest.version);
   await loadModel(twin, latest.version, $variantSelect.value);
 }
 
@@ -304,11 +305,40 @@ function fmt_vol(v) {
 }
 
 // ── Load model into viewport ──────────────────────────────────────────
+/**
+ * Rebuild the variant dropdown so it only contains options that
+ * actually exist for the given version (raw is always available).
+ */
+function updateVariantOptions(twin, version) {
+  const v = twin.versions.find((vv) => vv.version === version);
+  const prev = $variantSelect.value;
+  $variantSelect.innerHTML = "";
+
+  const addOpt = (value, label) => {
+    const o = document.createElement("option");
+    o.value = value;
+    o.textContent = label;
+    $variantSelect.appendChild(o);
+  };
+
+  addOpt("raw", "Raw");
+  if (v && v.is_cleaned) addOpt("clean", "Cleaned");
+  if (v && v.is_cropped) addOpt("cropped", "Cropped");
+
+  // Keep previous selection if still available, otherwise fall back to raw
+  if ([...  $variantSelect.options].some((o) => o.value === prev)) {
+    $variantSelect.value = prev;
+  } else {
+    $variantSelect.value = "raw";
+  }
+}
+
 async function loadModel(twin, version, variant) {
   const v = twin.versions.find((vv) => vv.version === version);
   if (!v) return;
   if (variant === "clean"   && !v.is_cleaned) variant = "raw";
   if (variant === "cropped" && !v.is_cropped) variant = "raw";
+  $variantSelect.value = variant;
   const url = `/api/twins/${twin.id}/versions/${version}/model?variant=${variant}`;
   $labelA.textContent = `v${version} · ${variant}`;
   // Hide the compare toggle when switching back to single-model view
@@ -433,11 +463,12 @@ async function runClean(force) {
   loading(true, "Cleaning mesh…", "Removing outliers — this may take 30–60 s");
   try {
     await api(url, { method: "POST" });
-    $variantSelect.value = "clean";
     const twin = await api(`/api/twins/${activeTwinId}`);
     await refreshList();
     populateVersions(twin);
     populateInfo(twin);
+    updateVariantOptions(twin, activeVersion);
+    $variantSelect.value = "clean";
     await loadModel(twin, activeVersion, "clean");
     toast(`v${activeVersion} cleaned`, "success");
   } catch (e) {
@@ -613,10 +644,11 @@ $btnCropApply.onclick = async () => {
         normal: plane.normalOrig,
       }),
     });
-    $variantSelect.value = "cropped";
     const twin = await api(`/api/twins/${activeTwinId}`);
     await refreshList();
     populateVersions(twin);
+    updateVariantOptions(twin, activeVersion);
+    $variantSelect.value = "cropped";
     await loadModel(twin, activeVersion, "cropped");
     toast(`v${activeVersion} cropped`, "success");
   } catch (e) {
@@ -751,6 +783,7 @@ $versionSelect.onchange = async () => {
   if (!activeTwinId) return;
   activeVersion = parseInt($versionSelect.value);
   const twin = await api(`/api/twins/${activeTwinId}`);
+  updateVariantOptions(twin, activeVersion);
   await loadModel(twin, activeVersion, $variantSelect.value);
 };
 
