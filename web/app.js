@@ -1,4 +1,4 @@
-import { initViewports, showSingle, showSideBySide, setWireframe, getViewportA, getViewportB } from "./viewer.js";
+import { initViewports, showSingle, showSideBySide, setWireframe, getViewportA, getViewportB, setRotation, setPositionOffset, resetTransform } from "./viewer.js";
 
 // ── State ─────────────────────────────────────────────────────────────
 let twins = [];
@@ -21,6 +21,8 @@ const $btnCrop       = document.getElementById("btn-crop");
 const $btnEnrich     = document.getElementById("btn-enrich");
 const $btnCompare    = document.getElementById("btn-compare");
 const $btnWireframe  = document.getElementById("btn-wireframe");
+const $btnTransform  = document.getElementById("btn-transform");
+const $transformPanel = document.getElementById("transform-panel");
 const $btnInfo       = document.getElementById("btn-info");
 const $btnCloseInfo  = document.getElementById("btn-close-info");
 const $infoPanel     = document.getElementById("info-panel");
@@ -157,6 +159,7 @@ async function selectTwin(id) {
   $btnEnrich.disabled   = false;
   $btnCompare.disabled  = twin.versions.length < 2;
   $btnWireframe.disabled = false;
+  $btnTransform.disabled = false;
 
   await loadModel(twin, latest.version, $variantSelect.value);
 }
@@ -266,6 +269,7 @@ async function loadModel(twin, version, variant) {
   $btnVpBToggle.style.display = "none";
   lastCompare = null;
   await showSingle(url);
+  resetSliders();
 }
 
 // ── Upload flow ───────────────────────────────────────────────────────
@@ -651,6 +655,7 @@ document.getElementById("modal-compare-confirm").onclick = async () => {
     $labelB.textContent = `v${vb} · heatmap`;
 
     await showSideBySide(urlA, result.heatmap_url);
+    resetSliders();
 
     // Store compare state so the toggle can switch between heatmap and model B
     lastCompare = { urlHeatmap: result.heatmap_url, urlModelB: urlB, va, vb, showingHeatmap: true };
@@ -717,6 +722,71 @@ $btnWireframe.onclick = () => {
   setWireframe(wireframeOn);
   $btnWireframe.classList.toggle("active", wireframeOn);
 };
+
+// ── Transform panel ───────────────────────────────────────────────────
+$btnTransform.onclick = () => {
+  $transformPanel.classList.toggle("visible");
+  $btnTransform.classList.toggle("active", $transformPanel.classList.contains("visible"));
+};
+document.getElementById("tp-close").onclick = () => {
+  $transformPanel.classList.remove("visible");
+  $btnTransform.classList.remove("active");
+};
+
+// Slider refs
+const tpSliders = {
+  rotX: document.getElementById("tp-rot-x"),
+  rotY: document.getElementById("tp-rot-y"),
+  rotZ: document.getElementById("tp-rot-z"),
+  posX: document.getElementById("tp-pos-x"),
+  posY: document.getElementById("tp-pos-y"),
+  posZ: document.getElementById("tp-pos-z"),
+};
+const tpValues = {
+  rotX: document.getElementById("tp-rot-x-val"),
+  rotY: document.getElementById("tp-rot-y-val"),
+  rotZ: document.getElementById("tp-rot-z-val"),
+  posX: document.getElementById("tp-pos-x-val"),
+  posY: document.getElementById("tp-pos-y-val"),
+  posZ: document.getElementById("tp-pos-z-val"),
+};
+
+function syncTransformFromSliders() {
+  const rx = parseFloat(tpSliders.rotX.value);
+  const ry = parseFloat(tpSliders.rotY.value);
+  const rz = parseFloat(tpSliders.rotZ.value);
+  tpValues.rotX.textContent = `${rx}°`;
+  tpValues.rotY.textContent = `${ry}°`;
+  tpValues.rotZ.textContent = `${rz}°`;
+  setRotation(rx, ry, rz);
+
+  const px = parseFloat(tpSliders.posX.value);
+  const py = parseFloat(tpSliders.posY.value);
+  const pz = parseFloat(tpSliders.posZ.value);
+  tpValues.posX.textContent = px.toFixed(2);
+  tpValues.posY.textContent = py.toFixed(2);
+  tpValues.posZ.textContent = pz.toFixed(2);
+  setPositionOffset(px, py, pz);
+}
+
+for (const slider of Object.values(tpSliders)) {
+  slider.addEventListener("input", syncTransformFromSliders);
+}
+
+function resetSliders() {
+  for (const slider of Object.values(tpSliders)) {
+    slider.value = 0;
+  }
+  tpValues.rotX.textContent = "0°";
+  tpValues.rotY.textContent = "0°";
+  tpValues.rotZ.textContent = "0°";
+  tpValues.posX.textContent = "0.00";
+  tpValues.posY.textContent = "0.00";
+  tpValues.posZ.textContent = "0.00";
+  resetTransform();
+}
+
+document.getElementById("tp-reset").onclick = resetSliders;
 
 // ── Info panel ────────────────────────────────────────────────────────
 $btnInfo.onclick = () => $infoPanel.classList.toggle("visible");

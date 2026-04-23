@@ -279,6 +279,48 @@
     }
     .legend-label { font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
 
+    /* Transform panel */
+    #transform-panel {
+      position: absolute;
+      top: 12px;
+      right: 14px;
+      z-index: 30;
+      width: 240px;
+      background: rgba(13, 15, 20, 0.92);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius);
+      backdrop-filter: blur(8px);
+      display: none;
+      flex-direction: column;
+      box-shadow: var(--shadow);
+    }
+    #transform-panel.visible { display: flex; }
+    .tp-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tp-header span { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+    .tp-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 0 2px; line-height: 1; }
+    .tp-close:hover { color: var(--text-primary); }
+    .tp-section { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    .tp-section:last-child { border-bottom: none; }
+    .tp-section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 8px; }
+    .tp-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .tp-row:last-child { margin-bottom: 0; }
+    .tp-axis { font-size: 11px; font-weight: 700; color: var(--text-secondary); width: 14px; text-align: center; flex-shrink: 0; }
+    .tp-axis-x { color: #e06060; }
+    .tp-axis-y { color: #60c060; }
+    .tp-axis-z { color: #6080e0; }
+    .tp-slider { flex: 1; -webkit-appearance: none; appearance: none; height: 4px; background: var(--border-light); border-radius: 2px; outline: none; cursor: pointer; }
+    .tp-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); cursor: pointer; border: none; }
+    .tp-slider::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); cursor: pointer; border: none; }
+    .tp-value { font-size: 10px; font-weight: 600; color: var(--text-secondary); width: 36px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+    .tp-reset { width: 100%; padding: 7px; border-radius: var(--radius-sm); background: var(--bg-active); border: 1px solid var(--border-light); color: var(--text-secondary); font-size: 11px; font-weight: 600; cursor: pointer; transition: background var(--transition); }
+    .tp-reset:hover { background: var(--bg-hover); color: var(--text-primary); }
+
     /* Viewport B toggle */
     #btn-vp-b-toggle {
       position: absolute;
@@ -590,6 +632,8 @@
     <button id="btn-compare" disabled>Compare…</button>
     <div class="spacer"></div>
     <button id="btn-wireframe" class="icon-btn" disabled title="Toggle wireframe">⊞ Wireframe</button>
+    <button id="btn-transform" class="icon-btn" disabled title="Transform controls">⊞ Transform</button>
+    <div class="tb-divider"></div>
     <select id="version-select" disabled><option>Version</option></select>
     <select id="variant-select">
       <option value="raw">Raw</option>
@@ -636,6 +680,53 @@
       <div class="drop-icon">📂</div>
       <div class="drop-text">Drop scan file to upload</div>
       <div class="drop-hint">.ply · .obj · .stl</div>
+    </div>
+
+    <!-- Transform panel -->
+    <div id="transform-panel">
+      <div class="tp-header">
+        <span>Transform</span>
+        <button class="tp-close" id="tp-close" aria-label="Close">✕</button>
+      </div>
+      <div class="tp-section">
+        <div class="tp-section-title">Rotation (°)</div>
+        <div class="tp-row">
+          <label class="tp-axis tp-axis-x" for="tp-rot-x">X</label>
+          <input type="range" class="tp-slider" id="tp-rot-x" min="-180" max="180" step="1" value="0">
+          <span class="tp-value" id="tp-rot-x-val">0°</span>
+        </div>
+        <div class="tp-row">
+          <label class="tp-axis tp-axis-y" for="tp-rot-y">Y</label>
+          <input type="range" class="tp-slider" id="tp-rot-y" min="-180" max="180" step="1" value="0">
+          <span class="tp-value" id="tp-rot-y-val">0°</span>
+        </div>
+        <div class="tp-row">
+          <label class="tp-axis tp-axis-z" for="tp-rot-z">Z</label>
+          <input type="range" class="tp-slider" id="tp-rot-z" min="-180" max="180" step="1" value="0">
+          <span class="tp-value" id="tp-rot-z-val">0°</span>
+        </div>
+      </div>
+      <div class="tp-section">
+        <div class="tp-section-title">Position</div>
+        <div class="tp-row">
+          <label class="tp-axis tp-axis-x" for="tp-pos-x">X</label>
+          <input type="range" class="tp-slider" id="tp-pos-x" min="-1" max="1" step="0.01" value="0">
+          <span class="tp-value" id="tp-pos-x-val">0.00</span>
+        </div>
+        <div class="tp-row">
+          <label class="tp-axis tp-axis-y" for="tp-pos-y">Y</label>
+          <input type="range" class="tp-slider" id="tp-pos-y" min="-1" max="1" step="0.01" value="0">
+          <span class="tp-value" id="tp-pos-y-val">0.00</span>
+        </div>
+        <div class="tp-row">
+          <label class="tp-axis tp-axis-z" for="tp-pos-z">Z</label>
+          <input type="range" class="tp-slider" id="tp-pos-z" min="-1" max="1" step="0.01" value="0">
+          <span class="tp-value" id="tp-pos-z-val">0.00</span>
+        </div>
+      </div>
+      <div class="tp-section">
+        <button class="tp-reset" id="tp-reset">Reset Transform</button>
+      </div>
     </div>
 
     <!-- Empty state -->

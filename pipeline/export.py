@@ -34,8 +34,23 @@ def _o3d_mesh_to_trimesh(mesh: o3d.geometry.TriangleMesh) -> trimesh.Trimesh:
 
 
 def export_glb(mesh: o3d.geometry.TriangleMesh, output_path: str) -> str:
-    """Export an Open3D mesh to GLB format for Three.js viewing."""
+    """Export an Open3D mesh to GLB format for Three.js viewing.
+
+    Detects Z-up meshes (common in STL/scanner output) and rotates
+    to Y-up (glTF convention) before export. The original mesh is
+    not modified.
+    """
     t_mesh = _o3d_mesh_to_trimesh(mesh)
+
+    # Auto-correct Z-up → Y-up: rotate -90° around X only when Z is clearly the
+    # dominant axis (Z-extent > 1.5× Y-extent). A tighter margin avoids rotating
+    # valid Y-up meshes that happen to be deeper in Z than tall in Y (e.g. pipes).
+    bounds = t_mesh.bounds  # [[min_x,min_y,min_z],[max_x,max_y,max_z]]
+    extents = bounds[1] - bounds[0]
+    if extents[2] > 1.5 * extents[1]:
+        rot = trimesh.transformations.rotation_matrix(-np.pi / 2, [1, 0, 0])
+        t_mesh.apply_transform(rot)
+
     p = Path(output_path)
     p.parent.mkdir(parents=True, exist_ok=True)
     t_mesh.export(str(p), file_type="glb")

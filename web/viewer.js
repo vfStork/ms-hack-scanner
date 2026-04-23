@@ -38,6 +38,7 @@ class Viewport {
     this.scene.add(grid);
 
     this.currentModel = null;
+    this.pivotGroup = null;
     this._wireframe = false;
     // Original-space model info (set on each loadGLB, used for clipping conversion)
     this._origCenter = null;
@@ -49,8 +50,8 @@ class Viewport {
 
   setWireframe(enabled) {
     this._wireframe = enabled;
-    if (!this.currentModel) return;
-    this.currentModel.traverse((obj) => {
+    if (!this.pivotGroup) return;
+    this.pivotGroup.traverse((obj) => {
       if (obj.isMesh) obj.material.wireframe = enabled;
     });
   }
@@ -71,7 +72,7 @@ class Viewport {
       new GLTFLoader().load(
         url,
         (gltf) => {
-          if (this.currentModel) this.scene.remove(this.currentModel);
+          if (this.pivotGroup) this.scene.remove(this.pivotGroup);
           this.currentModel = gltf.scene;
 
           // The GLTF spec default PBR material has metallicFactor=1 which
@@ -88,6 +89,7 @@ class Viewport {
             });
           });
 
+          // Scale to fit viewport
           const box = new THREE.Box3().setFromObject(this.currentModel);
           const center = box.getCenter(new THREE.Vector3());
           const size = box.getSize(new THREE.Vector3()).length();
@@ -99,7 +101,23 @@ class Viewport {
           this._origBox = box.clone();
 
           this.currentModel.scale.setScalar(scale);
-          this.currentModel.position.sub(center.multiplyScalar(scale));
+
+          // Recompute bounds after scaling
+          const scaledBox = new THREE.Box3().setFromObject(this.currentModel);
+          const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
+          const scaledMin = scaledBox.min;
+
+          // Position model so its bottom sits on Y=0 and it's centered on X/Z
+          this.currentModel.position.set(
+            -scaledCenter.x,
+            -scaledMin.y,
+            -scaledCenter.z,
+          );
+
+          // Create pivot at origin (grid contact point) for rotation
+          this.pivotGroup = new THREE.Group();
+          this.pivotGroup.add(this.currentModel);
+          this.scene.add(this.pivotGroup);
 
           if (this._wireframe) {
             this.currentModel.traverse((obj) => {
@@ -107,7 +125,6 @@ class Viewport {
             });
           }
 
-          this.scene.add(this.currentModel);
           this.controls.reset();
           resolve();
         },
@@ -118,10 +135,31 @@ class Viewport {
   }
 
   clear() {
-    if (this.currentModel) {
-      this.scene.remove(this.currentModel);
+    if (this.pivotGroup) {
+      this.scene.remove(this.pivotGroup);
+      this.pivotGroup = null;
       this.currentModel = null;
     }
+  }
+
+  setRotation(xDeg, yDeg, zDeg) {
+    if (!this.pivotGroup) return;
+    this.pivotGroup.rotation.set(
+      (xDeg * Math.PI) / 180,
+      (yDeg * Math.PI) / 180,
+      (zDeg * Math.PI) / 180,
+    );
+  }
+
+  setPositionOffset(x, y, z) {
+    if (!this.pivotGroup) return;
+    this.pivotGroup.position.set(x, y, z);
+  }
+
+  resetTransform() {
+    if (!this.pivotGroup) return;
+    this.pivotGroup.rotation.set(0, 0, 0);
+    this.pivotGroup.position.set(0, 0, 0);
   }
 
   // ── Model info (original GLB coordinate space) ───────────────────────
@@ -236,6 +274,21 @@ export function getViewportB() { return vpB; }
 export function setWireframe(enabled) {
   vpA.setWireframe(enabled);
   vpB.setWireframe(enabled);
+}
+
+export function setRotation(xDeg, yDeg, zDeg) {
+  vpA.setRotation(xDeg, yDeg, zDeg);
+  vpB.setRotation(xDeg, yDeg, zDeg);
+}
+
+export function setPositionOffset(x, y, z) {
+  vpA.setPositionOffset(x, y, z);
+  vpB.setPositionOffset(x, y, z);
+}
+
+export function resetTransform() {
+  vpA.resetTransform();
+  vpB.resetTransform();
 }
 
 function _removeSyncListeners() {
