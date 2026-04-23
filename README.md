@@ -38,6 +38,7 @@ cp .env.example .env   # fill in your Azure OpenAI credentials
 ## Run (Web)
 
 ```bash
+source .venv/bin/activate   # activate venv first
 python main.py serve
 # Open http://localhost:8000
 ```
@@ -45,6 +46,7 @@ python main.py serve
 ## Run (CLI)
 
 ```bash
+source .venv/bin/activate   # activate venv first
 python main.py upload scan.ply --name "Valve A"
 python main.py clean <twin-id>
 python main.py enrich <twin-id>
