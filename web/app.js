@@ -127,7 +127,7 @@ function renderList() {
     el.innerHTML = `
       <div class="twin-item-header">
         <div class="twin-item-name">${esc(t.name)}</div>
-        <button class="btn-delete-twin" type="button" title="Delete twin" aria-label="Delete twin" data-id="${t.id}" data-name="${esc(t.name)}">🗑</button>
+        <button class="btn-delete-twin" type="button" title="Delete twin" aria-label="Delete twin ${esc(t.name)}" data-id="${t.id}" data-name="${esc(t.name)}">🗑</button>
       </div>
       <div class="twin-item-meta">
         <span>${t.versions.length} version${t.versions.length !== 1 ? "s" : ""}</span>
