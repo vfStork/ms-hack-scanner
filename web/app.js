@@ -511,7 +511,7 @@ function _drawCutLine(x1, y1, x2, y2) {
   ctx.beginPath();
   ctx.moveTo(x1, y1);
   ctx.lineTo(x2, y2);
-  ctx.strokeStyle = "#4a7fc1";
+  ctx.strokeStyle = "#00f0ff";
   ctx.lineWidth = 2.5;
   ctx.setLineDash([7, 4]);
   ctx.stroke();
@@ -521,7 +521,7 @@ function _drawCutLine(x1, y1, x2, y2) {
   [[ x1, y1 ], [ x2, y2 ]].forEach(([x, y]) => {
     ctx.beginPath();
     ctx.arc(x, y, 5, 0, Math.PI * 2);
-    ctx.fillStyle = "#4a7fc1";
+    ctx.fillStyle = "#00f0ff";
     ctx.fill();
   });
 
@@ -532,7 +532,7 @@ function _drawCutLine(x1, y1, x2, y2) {
   ctx.lineTo(x2 - 14 * Math.cos(angle - 0.4), y2 - 14 * Math.sin(angle - 0.4));
   ctx.lineTo(x2 - 14 * Math.cos(angle + 0.4), y2 - 14 * Math.sin(angle + 0.4));
   ctx.closePath();
-  ctx.fillStyle = "#4a7fc1";
+  ctx.fillStyle = "#00f0ff";
   ctx.fill();
 }
 

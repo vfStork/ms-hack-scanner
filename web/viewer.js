@@ -7,7 +7,7 @@ class Viewport {
     this.canvas = canvas;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0d0f14);
+    this.scene.background = new THREE.Color(0x06060e);
 
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.001, 1000);
     this.camera.position.set(0, 0.5, 1.5);
@@ -24,17 +24,17 @@ class Viewport {
     this.controls.minDistance = 0.05;
     this.controls.maxDistance = 100;
 
-    // Lighting rig: ambient + hemisphere + key + rim
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.35));
-    this.scene.add(new THREE.HemisphereLight(0x8ab4e8, 0x3d2b1f, 0.55));
-    const key = new THREE.DirectionalLight(0xffffff, 0.9);
+    // Lighting rig: ambient + hemisphere + key + rim (cyberpunk tones)
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+    this.scene.add(new THREE.HemisphereLight(0x00f0ff, 0x1a0020, 0.5));
+    const key = new THREE.DirectionalLight(0xeeffff, 0.85);
     key.position.set(3, 5, 3);
     this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0x4a7fc1, 0.35);
+    const rim = new THREE.DirectionalLight(0xff00aa, 0.25);
     rim.position.set(-3, 1, -3);
     this.scene.add(rim);
 
-    const grid = new THREE.GridHelper(4, 40, 0x252836, 0x1a1d27);
+    const grid = new THREE.GridHelper(4, 40, 0x0a2040, 0x081530);
     this.scene.add(grid);
 
     this.currentModel = null;
