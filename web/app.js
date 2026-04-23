@@ -3,6 +3,7 @@ import { initViewports, showSingle, showSideBySide, setWireframe, getViewportA, 
 // ── State ─────────────────────────────────────────────────────────────
 let twins = [];
 let activeTwinId = null;
+let activeTwin = null;        // full twin object from API (includes transform)
 let activeVersion = null;
 let pendingFile = null;       // file waiting for name confirmation
 let wireframeOn = false;
@@ -40,6 +41,7 @@ const $loadingTitle  = document.getElementById("loading-title");
 const $loadingStep   = document.getElementById("loading-step");
 const $modalUpload   = document.getElementById("modal-upload");
 const $modalCompare  = document.getElementById("modal-compare");
+const $modalDelete   = document.getElementById("modal-delete");
 const $nameInput     = document.getElementById("twin-name-input");
 const $cmpVa         = document.getElementById("cmp-va");
 const $cmpVb         = document.getElementById("cmp-vb");
@@ -126,7 +128,10 @@ function renderList() {
     const el = document.createElement("div");
     el.className = "twin-item" + (t.id === activeTwinId ? " active" : "");
     el.innerHTML = `
-      <div class="twin-item-name">${esc(t.name)}</div>
+      <div class="twin-item-header">
+        <div class="twin-item-name">${esc(t.name)}</div>
+        <button class="btn-delete-twin" type="button" aria-label="Delete twin ${esc(t.name)}" data-id="${t.id}" data-name="${esc(t.name)}">🗑</button>
+      </div>
       <div class="twin-item-meta">
         <span>${t.versions.length} version${t.versions.length !== 1 ? "s" : ""}</span>
         <span style="color:var(--border-light)">·</span>
@@ -134,10 +139,55 @@ function renderList() {
         ${badges}
       </div>
     `;
-    el.onclick = () => selectTwin(t.id);
+    el.onclick = (e) => {
+      if (e.target.closest(".btn-delete-twin")) return;
+      selectTwin(t.id);
+    };
+    el.querySelector(".btn-delete-twin").onclick = (e) => {
+      e.stopPropagation();
+      confirmDeleteTwin(t.id, t.name);
+    };
     $list.appendChild(el);
   }
 }
+
+// ── Delete twin ───────────────────────────────────────────────────────
+let pendingDeleteId = null;
+
+function confirmDeleteTwin(id, name) {
+  pendingDeleteId = id;
+  document.getElementById("modal-delete-msg").textContent =
+    `Are you sure you want to delete "${name}"? This will permanently remove the twin and all its scan files.`;
+  openModal($modalDelete);
+}
+
+document.getElementById("modal-delete-confirm").onclick = async () => {
+  if (!pendingDeleteId) return;
+  closeModal($modalDelete);
+  const idToDelete = pendingDeleteId;
+  pendingDeleteId = null;
+
+  loading(true, "Deleting twin…", "Removing files");
+  try {
+    await api(`/api/twins/${idToDelete}`, { method: "DELETE" });
+    if (activeTwinId === idToDelete) {
+      activeTwinId = null;
+      activeVersion = null;
+      setEmptyState(true);
+    }
+    await refreshList();
+    toast("Twin deleted", "success");
+  } catch (e) {
+    toast("Delete failed: " + e.message, "error");
+  } finally {
+    loading(false);
+  }
+};
+
+document.getElementById("modal-delete-cancel").onclick = () => {
+  closeModal($modalDelete);
+  pendingDeleteId = null;
+};
 
 // ── Select twin ───────────────────────────────────────────────────────
 async function selectTwin(id) {
@@ -145,6 +195,7 @@ async function selectTwin(id) {
   setEmptyState(false);
 
   const twin = await api(`/api/twins/${id}`);
+  activeTwin = twin;
   renderList();
   populateVersions(twin);
   populateInfo(twin);
@@ -152,6 +203,7 @@ async function selectTwin(id) {
   const latest = twin.versions[twin.versions.length - 1];
   activeVersion = latest.version;
   $versionSelect.value = latest.version;
+  populateVariants(twin, latest.version);
 
   $btnRescan.disabled   = false;
   $btnClean.disabled    = false;
@@ -173,6 +225,27 @@ function populateVersions(twin) {
     opt.textContent = `v${v.version}${v.is_cleaned ? " ✓" : ""}`;
     $versionSelect.appendChild(opt);
   }
+}
+
+function populateVariants(twin, version) {
+  const v = twin.versions.find((vv) => vv.version === version);
+  const prev = $variantSelect.value;
+  $variantSelect.innerHTML = "";
+
+  const add = (value, label) => {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = label;
+    $variantSelect.appendChild(opt);
+  };
+
+  add("raw", "Raw");
+  if (v && v.is_cleaned) add("clean", "Cleaned");
+  if (v && v.is_cropped) add("cropped", "Cropped");
+
+  // Keep previous selection if still available, otherwise fall back to raw
+  const available = [...$variantSelect.options].map((o) => o.value);
+  $variantSelect.value = available.includes(prev) ? prev : "raw";
 }
 
 // ── Info panel ────────────────────────────────────────────────────────
@@ -269,7 +342,7 @@ async function loadModel(twin, version, variant) {
   $btnVpBToggle.style.display = "none";
   lastCompare = null;
   await showSingle(url);
-  resetSliders();
+  applyTwinTransform();
 }
 
 // ── Upload flow ───────────────────────────────────────────────────────
@@ -388,11 +461,12 @@ async function runClean(force) {
   loading(true, "Cleaning mesh…", "Removing outliers — this may take 30–60 s");
   try {
     await api(url, { method: "POST" });
-    $variantSelect.value = "clean";
     const twin = await api(`/api/twins/${activeTwinId}`);
     await refreshList();
     populateVersions(twin);
+    populateVariants(twin, activeVersion);
     populateInfo(twin);
+    $variantSelect.value = "clean";
     await loadModel(twin, activeVersion, "clean");
     toast(`v${activeVersion} cleaned`, "success");
   } catch (e) {
@@ -437,7 +511,7 @@ function _drawCutLine(x1, y1, x2, y2) {
   ctx.beginPath();
   ctx.moveTo(x1, y1);
   ctx.lineTo(x2, y2);
-  ctx.strokeStyle = "#4a7fc1";
+  ctx.strokeStyle = "#00f0ff";
   ctx.lineWidth = 2.5;
   ctx.setLineDash([7, 4]);
   ctx.stroke();
@@ -447,7 +521,7 @@ function _drawCutLine(x1, y1, x2, y2) {
   [[ x1, y1 ], [ x2, y2 ]].forEach(([x, y]) => {
     ctx.beginPath();
     ctx.arc(x, y, 5, 0, Math.PI * 2);
-    ctx.fillStyle = "#4a7fc1";
+    ctx.fillStyle = "#00f0ff";
     ctx.fill();
   });
 
@@ -458,7 +532,7 @@ function _drawCutLine(x1, y1, x2, y2) {
   ctx.lineTo(x2 - 14 * Math.cos(angle - 0.4), y2 - 14 * Math.sin(angle - 0.4));
   ctx.lineTo(x2 - 14 * Math.cos(angle + 0.4), y2 - 14 * Math.sin(angle + 0.4));
   ctx.closePath();
-  ctx.fillStyle = "#4a7fc1";
+  ctx.fillStyle = "#00f0ff";
   ctx.fill();
 }
 
@@ -568,10 +642,11 @@ $btnCropApply.onclick = async () => {
         normal: plane.normalOrig,
       }),
     });
-    $variantSelect.value = "cropped";
     const twin = await api(`/api/twins/${activeTwinId}`);
     await refreshList();
     populateVersions(twin);
+    populateVariants(twin, activeVersion);
+    $variantSelect.value = "cropped";
     await loadModel(twin, activeVersion, "cropped");
     toast(`v${activeVersion} cropped`, "success");
   } catch (e) {
@@ -655,7 +730,7 @@ document.getElementById("modal-compare-confirm").onclick = async () => {
     $labelB.textContent = `v${vb} · heatmap`;
 
     await showSideBySide(urlA, result.heatmap_url);
-    resetSliders();
+    applyTwinTransform();
 
     // Store compare state so the toggle can switch between heatmap and model B
     lastCompare = { urlHeatmap: result.heatmap_url, urlModelB: urlB, va, vb, showingHeatmap: true };
@@ -707,6 +782,7 @@ $versionSelect.onchange = async () => {
   if (!activeTwinId) return;
   activeVersion = parseInt($versionSelect.value);
   const twin = await api(`/api/twins/${activeTwinId}`);
+  populateVariants(twin, activeVersion);
   await loadModel(twin, activeVersion, $variantSelect.value);
 };
 
@@ -767,6 +843,50 @@ function syncTransformFromSliders() {
   tpValues.posY.textContent = py.toFixed(2);
   tpValues.posZ.textContent = pz.toFixed(2);
   setPositionOffset(px, py, pz);
+
+  debouncedSaveTransform();
+}
+
+// Debounced save — waits 500ms after last slider change before calling API
+let _saveTimer = null;
+function debouncedSaveTransform() {
+  if (!activeTwinId) return;
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    const body = {
+      rot_x: parseFloat(tpSliders.rotX.value),
+      rot_y: parseFloat(tpSliders.rotY.value),
+      rot_z: parseFloat(tpSliders.rotZ.value),
+      pos_x: parseFloat(tpSliders.posX.value),
+      pos_y: parseFloat(tpSliders.posY.value),
+      pos_z: parseFloat(tpSliders.posZ.value),
+    };
+    fetch(`/api/twins/${activeTwinId}/transform`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).catch(() => {});
+  }, 500);
+}
+
+// Apply stored transform from the active twin to sliders + viewport
+function applyTwinTransform() {
+  const t = activeTwin?.transform;
+  if (!t) { resetSliders(); return; }
+  tpSliders.rotX.value = t.rot_x ?? 0;
+  tpSliders.rotY.value = t.rot_y ?? 0;
+  tpSliders.rotZ.value = t.rot_z ?? 0;
+  tpSliders.posX.value = t.pos_x ?? 0;
+  tpSliders.posY.value = t.pos_y ?? 0;
+  tpSliders.posZ.value = t.pos_z ?? 0;
+  tpValues.rotX.textContent = `${t.rot_x ?? 0}°`;
+  tpValues.rotY.textContent = `${t.rot_y ?? 0}°`;
+  tpValues.rotZ.textContent = `${t.rot_z ?? 0}°`;
+  tpValues.posX.textContent = (t.pos_x ?? 0).toFixed(2);
+  tpValues.posY.textContent = (t.pos_y ?? 0).toFixed(2);
+  tpValues.posZ.textContent = (t.pos_z ?? 0).toFixed(2);
+  setRotation(t.rot_x ?? 0, t.rot_y ?? 0, t.rot_z ?? 0);
+  setPositionOffset(t.pos_x ?? 0, t.pos_y ?? 0, t.pos_z ?? 0);
 }
 
 for (const slider of Object.values(tpSliders)) {
@@ -784,6 +904,7 @@ function resetSliders() {
   tpValues.posY.textContent = "0.00";
   tpValues.posZ.textContent = "0.00";
   resetTransform();
+  debouncedSaveTransform();
 }
 
 document.getElementById("tp-reset").onclick = resetSliders;

@@ -48,6 +48,8 @@ python main.py serve
 ```bash
 source .venv/bin/activate   # activate venv first
 python main.py upload scan.ply --name "Valve A"
+python main.py delete <twin-id>            # with confirmation prompt
+python main.py delete <twin-id> --yes      # skip confirmation
 python main.py clean <twin-id>
 python main.py enrich <twin-id>
 python main.py rescan <twin-id> scan_v2.ply
@@ -120,3 +122,11 @@ The cropped `.ply` / `.glb` is served at:
 ```
 GET /api/twins/{twin_id}/versions/{version}/model?variant=cropped
 ```
+
+## REST API — Delete endpoint
+
+```
+DELETE /api/twins/{twin_id}
+```
+
+Permanently removes the twin and all associated scan files. Returns `{"deleted": "<twin_id>"}` on success.

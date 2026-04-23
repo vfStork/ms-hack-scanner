@@ -21,8 +21,14 @@ az acr login --name vfhackteam4acr
 ### 2. Build the Docker image
 
 ```bash
-docker build --no-cache --network=host -t vfhackteam4acr.azurecr.io/ms-hack-scanner:latest .
+DOCKER_BUILDKIT=1 docker build --network=host -t vfhackteam4acr.azurecr.io/ms-hack-scanner:latest .
 ```
+
+Notes:
+
+- Avoid `--no-cache` unless you are intentionally invalidating all Docker layers. It makes rebuilds much slower.
+- The Dockerfile now uses a BuildKit pip cache mount, so repeated builds can reuse downloaded Python wheels. If Docker BuildKit is disabled on your machine, run `DOCKER_BUILDKIT=1 docker build ...`.
+- The repository now includes a `.dockerignore`, so local data like `.git/`, `.venv/`, `twins/`, and `.env` are excluded from the build context.
 
 ### 3. Push the image to ACR
 
