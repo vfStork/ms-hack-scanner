@@ -15,10 +15,22 @@ def _o3d_mesh_to_trimesh(mesh: o3d.geometry.TriangleMesh) -> trimesh.Trimesh:
         # Add alpha channel
         alpha = np.full((len(colors), 1), 255, dtype=np.uint8)
         kwargs["vertex_colors"] = np.hstack([colors, alpha])
-    if mesh.has_vertex_normals():
-        kwargs["vertex_normals"] = np.asarray(mesh.vertex_normals)
 
-    return trimesh.Trimesh(vertices=vertices, faces=faces, **kwargs)
+    # process=False preserves the vertex order so vertex_colors stays aligned.
+    # trimesh's default process=True merges/reorders vertices which silently
+    # drops or misaligns color data, causing the model to render black.
+    t_mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False, **kwargs)
+
+    # Set a non-metallic PBR material. Without this, trimesh writes no material
+    # and GLB viewers apply the GLTF default (metallicFactor=1.0), which renders
+    # pitch-black under standard lighting with no environment map.
+    # Assigning the material AFTER construction keeps COLOR_0 intact.
+    t_mesh.visual.material = trimesh.visual.material.PBRMaterial(
+        metallicFactor=0.0,
+        roughnessFactor=0.8,
+    )
+
+    return t_mesh
 
 
 def export_glb(mesh: o3d.geometry.TriangleMesh, output_path: str) -> str:
