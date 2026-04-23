@@ -203,6 +203,7 @@ async function selectTwin(id) {
   const latest = twin.versions[twin.versions.length - 1];
   activeVersion = latest.version;
   $versionSelect.value = latest.version;
+  populateVariants(twin, latest.version);
 
   $btnRescan.disabled   = false;
   $btnClean.disabled    = false;
@@ -224,6 +225,27 @@ function populateVersions(twin) {
     opt.textContent = `v${v.version}${v.is_cleaned ? " ✓" : ""}`;
     $versionSelect.appendChild(opt);
   }
+}
+
+function populateVariants(twin, version) {
+  const v = twin.versions.find((vv) => vv.version === version);
+  const prev = $variantSelect.value;
+  $variantSelect.innerHTML = "";
+
+  const add = (value, label) => {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = label;
+    $variantSelect.appendChild(opt);
+  };
+
+  add("raw", "Raw");
+  if (v && v.is_cleaned) add("clean", "Cleaned");
+  if (v && v.is_cropped) add("cropped", "Cropped");
+
+  // Keep previous selection if still available, otherwise fall back to raw
+  const available = [...$variantSelect.options].map((o) => o.value);
+  $variantSelect.value = available.includes(prev) ? prev : "raw";
 }
 
 // ── Info panel ────────────────────────────────────────────────────────
@@ -439,11 +461,12 @@ async function runClean(force) {
   loading(true, "Cleaning mesh…", "Removing outliers — this may take 30–60 s");
   try {
     await api(url, { method: "POST" });
-    $variantSelect.value = "clean";
     const twin = await api(`/api/twins/${activeTwinId}`);
     await refreshList();
     populateVersions(twin);
+    populateVariants(twin, activeVersion);
     populateInfo(twin);
+    $variantSelect.value = "clean";
     await loadModel(twin, activeVersion, "clean");
     toast(`v${activeVersion} cleaned`, "success");
   } catch (e) {
@@ -619,10 +642,11 @@ $btnCropApply.onclick = async () => {
         normal: plane.normalOrig,
       }),
     });
-    $variantSelect.value = "cropped";
     const twin = await api(`/api/twins/${activeTwinId}`);
     await refreshList();
     populateVersions(twin);
+    populateVariants(twin, activeVersion);
+    $variantSelect.value = "cropped";
     await loadModel(twin, activeVersion, "cropped");
     toast(`v${activeVersion} cropped`, "success");
   } catch (e) {
@@ -758,6 +782,7 @@ $versionSelect.onchange = async () => {
   if (!activeTwinId) return;
   activeVersion = parseInt($versionSelect.value);
   const twin = await api(`/api/twins/${activeTwinId}`);
+  populateVariants(twin, activeVersion);
   await loadModel(twin, activeVersion, $variantSelect.value);
 };
 
