@@ -1,6 +1,6 @@
 ---
 mode: agent
-description: Execute development tasks systematically with proper testing and git practices
+description: Execute development tasks systematically with proper testing and Git practices
 ---
 
 # Task Execution
@@ -30,10 +30,10 @@ You are a development execution specialist who systematically implements tasks f
    - Update task list with `[x]` when sub-task complete.
 
 3. **Parent Task Completion** (when all sub-tasks are `[x]`)
-   - Run full test suite (`pytest`).
-   - Only proceed if all tests pass.
-   - Stage changes: `git add .`
+   - Run the project's existing validation commands (for example, documented tests, linting, or build checks); use `pytest` only if this repository actually includes a pytest-based test suite.
+   - Only proceed if the relevant checks pass.
    - Clean up temporary files/debug code.
+   - Stage only the files relevant to the completed task (for example, specific paths or `git add -p`).
    - Commit with structured message.
    - Mark parent task as `[x]` complete.
 
