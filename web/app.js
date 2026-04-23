@@ -1,4 +1,4 @@
-import { initViewports, showSingle, showSideBySide, setWireframe } from "./viewer.js";
+import { initViewports, showSingle, showSideBySide, setWireframe, getViewportB } from "./viewer.js";
 
 // ── State ─────────────────────────────────────────────────────────────
 let twins = [];
@@ -6,6 +6,8 @@ let activeTwinId = null;
 let activeVersion = null;
 let pendingFile = null;       // file waiting for name confirmation
 let wireframeOn = false;
+// Tracks the last comparison so the vp-b toggle can switch between heatmap and model B
+let lastCompare = null;       // { urlHeatmap, urlModelB, va, vb, showingHeatmap }
 
 // ── DOM refs ──────────────────────────────────────────────────────────
 const $list          = document.getElementById("twin-list");
@@ -27,6 +29,8 @@ const $diffContent   = document.getElementById("diff-stats-content");
 const $changelog     = document.getElementById("changelog-section");
 const $labelA        = document.getElementById("label-a");
 const $labelB        = document.getElementById("label-b");
+const $btnVpBToggle  = document.getElementById("btn-vp-b-toggle");
+const $heatmapLegend = document.getElementById("heatmap-legend");
 const $emptyState    = document.getElementById("empty-state-vp");
 const $loadingEl     = document.getElementById("loading");
 const $loadingTitle  = document.getElementById("loading-title");
@@ -253,6 +257,9 @@ async function loadModel(twin, version, variant) {
   if (variant === "clean" && !v.is_cleaned) variant = "raw";
   const url = `/api/twins/${twin.id}/versions/${version}/model?variant=${variant}`;
   $labelA.textContent = `v${version} · ${variant}`;
+  // Hide the compare toggle when switching back to single-model view
+  $btnVpBToggle.style.display = "none";
+  lastCompare = null;
   await showSingle(url);
 }
 
@@ -452,10 +459,18 @@ document.getElementById("modal-compare-confirm").onclick = async () => {
     clearInterval(stepTimer);
 
     const urlA = `/api/twins/${activeTwinId}/versions/${va}/model?variant=${useCleaned ? "clean" : "raw"}`;
+    const urlB = `/api/twins/${activeTwinId}/versions/${vb}/model?variant=${useCleaned ? "clean" : "raw"}`;
     $labelA.textContent = `v${va} · ${useCleaned ? "cleaned" : "raw"}`;
     $labelB.textContent = `v${vb} · heatmap`;
 
     await showSideBySide(urlA, result.heatmap_url);
+
+    // Store compare state so the toggle can switch between heatmap and model B
+    lastCompare = { urlHeatmap: result.heatmap_url, urlModelB: urlB, va, vb, showingHeatmap: true };
+    $btnVpBToggle.textContent = "⇄ Show Model B";
+    $btnVpBToggle.classList.remove("active");
+    $btnVpBToggle.style.display = "block";
+    $heatmapLegend.style.display = "flex";
 
     const twin = await api(`/api/twins/${activeTwinId}`);
     await refreshList();
@@ -471,6 +486,29 @@ document.getElementById("modal-compare-confirm").onclick = async () => {
 };
 
 document.getElementById("modal-compare-cancel").onclick = () => closeModal($modalCompare);
+
+// ── Viewport B toggle (heatmap ↔ model B) ────────────────────────────
+$btnVpBToggle.onclick = async () => {
+  if (!lastCompare) return;
+  const { urlHeatmap, urlModelB, va, vb, showingHeatmap } = lastCompare;
+  if (showingHeatmap) {
+    // Switch to model B
+    await getViewportB().loadGLB(urlModelB);
+    $labelB.textContent = `v${vb} · raw`;
+    $btnVpBToggle.textContent = "⇄ Show Heatmap";
+    $btnVpBToggle.classList.add("active");
+    $heatmapLegend.style.display = "none";
+    lastCompare.showingHeatmap = false;
+  } else {
+    // Switch back to heatmap
+    await getViewportB().loadGLB(urlHeatmap);
+    $labelB.textContent = `v${vb} · heatmap`;
+    $btnVpBToggle.textContent = "⇄ Show Model B";
+    $btnVpBToggle.classList.remove("active");
+    $heatmapLegend.style.display = "flex";
+    lastCompare.showingHeatmap = true;
+  }
+};
 
 // ── Version / variant selectors ───────────────────────────────────────
 $versionSelect.onchange = async () => {

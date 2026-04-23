@@ -279,6 +279,36 @@
     }
     .legend-label { font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
 
+    /* Viewport B toggle */
+    #btn-vp-b-toggle {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 10;
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      background: rgba(13, 15, 20, 0.82);
+      border: 1px solid var(--border-light);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      backdrop-filter: blur(6px);
+      transition: background var(--transition), border-color var(--transition), color var(--transition);
+      display: none;
+    }
+    #btn-vp-b-toggle:hover {
+      background: var(--bg-hover);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    #btn-vp-b-toggle.active {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
     /* Drop zone */
     #drop-zone {
       position: absolute;
@@ -549,6 +579,7 @@
     <div id="vp-b-wrap" class="vp-wrap" style="display:none">
       <div class="vp-label" id="label-b">Changes Heatmap</div>
       <canvas id="viewport-b"></canvas>
+      <button id="btn-vp-b-toggle" title="Switch between heatmap and reference model">⇄ Show Model B</button>
       <div id="heatmap-legend">
         <div class="legend-label">Max</div>
         <div id="legend-bar"></div>
