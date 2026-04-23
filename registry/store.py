@@ -162,10 +162,30 @@ def update_metadata(twin_id: str, metadata: dict) -> Twin:
     return twin
 
 
+def _validated_twin_dir_for_delete(twin_id: str) -> Path:
+    """Return a twin directory path that is safe to delete."""
+    try:
+        uuid.UUID(twin_id)
+    except ValueError as exc:
+        raise ValueError(f"Invalid twin_id format: {twin_id}") from exc
+
+    twins_root = TWINS_DIR.resolve()
+    twin_dir = (twins_root / twin_id).resolve()
+
+    try:
+        twin_dir.relative_to(twins_root)
+    except ValueError as exc:
+        raise ValueError(
+            f"Refusing to delete path outside twins directory: {twin_id}"
+        ) from exc
+
+    return twin_dir
+
+
 def delete_twin(twin_id: str) -> None:
     """Delete a twin and all its associated files from disk."""
-    twin = _load(twin_id)  # raises FileNotFoundError if missing
-    twin_dir = _twin_dir(twin_id)
+    _load(twin_id)  # raises FileNotFoundError if missing
+    twin_dir = _validated_twin_dir_for_delete(twin_id)
     shutil.rmtree(twin_dir)
 
 
