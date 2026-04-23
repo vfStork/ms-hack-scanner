@@ -1,4 +1,4 @@
-import { initViewports, showSingle, showSideBySide, setWireframe, getViewportB, setRotation, setPositionOffset, resetTransform } from "./viewer.js";
+import { initViewports, showSingle, showSideBySide, setWireframe, getViewportA, getViewportB, setRotation, setPositionOffset, resetTransform } from "./viewer.js";
 
 // ── State ─────────────────────────────────────────────────────────────
 let twins = [];
@@ -17,6 +17,7 @@ const $variantSelect = document.getElementById("variant-select");
 const $btnNewUpload  = document.getElementById("btn-new-upload");
 const $btnRescan     = document.getElementById("btn-rescan");
 const $btnClean      = document.getElementById("btn-clean");
+const $btnCrop       = document.getElementById("btn-crop");
 const $btnEnrich     = document.getElementById("btn-enrich");
 const $btnCompare    = document.getElementById("btn-compare");
 const $btnWireframe  = document.getElementById("btn-wireframe");
@@ -79,7 +80,9 @@ async function api(path, opts = {}) {
   const res = await fetch(path, opts);
   if (!res.ok) {
     const body = await res.text().catch(() => res.statusText);
-    throw new Error(body || `HTTP ${res.status}`);
+    const err = new Error(body || `HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }
@@ -152,6 +155,7 @@ async function selectTwin(id) {
 
   $btnRescan.disabled   = false;
   $btnClean.disabled    = false;
+  $btnCrop.disabled     = false;
   $btnEnrich.disabled   = false;
   $btnCompare.disabled  = twin.versions.length < 2;
   $btnWireframe.disabled = false;
@@ -257,7 +261,8 @@ function fmt_vol(v) {
 async function loadModel(twin, version, variant) {
   const v = twin.versions.find((vv) => vv.version === version);
   if (!v) return;
-  if (variant === "clean" && !v.is_cleaned) variant = "raw";
+  if (variant === "clean"   && !v.is_cleaned) variant = "raw";
+  if (variant === "cropped" && !v.is_cropped) variant = "raw";
   const url = `/api/twins/${twin.id}/versions/${version}/model?variant=${variant}`;
   $labelA.textContent = `v${version} · ${variant}`;
   // Hide the compare toggle when switching back to single-model view
@@ -374,11 +379,14 @@ $container.addEventListener("drop", (e) => {
 // ── Clean ─────────────────────────────────────────────────────────────
 $btnClean.onclick = async () => {
   if (!activeTwinId || !activeVersion) return;
+  await runClean(false);
+};
+
+async function runClean(force) {
+  const url = `/api/twins/${activeTwinId}/versions/${activeVersion}/clean${force ? "?force=true" : ""}`;
   loading(true, "Cleaning mesh…", "Removing outliers — this may take 30–60 s");
   try {
-    await api(`/api/twins/${activeTwinId}/versions/${activeVersion}/clean`, {
-      method: "POST",
-    });
+    await api(url, { method: "POST" });
     $variantSelect.value = "clean";
     const twin = await api(`/api/twins/${activeTwinId}`);
     await refreshList();
@@ -387,7 +395,186 @@ $btnClean.onclick = async () => {
     await loadModel(twin, activeVersion, "clean");
     toast(`v${activeVersion} cleaned`, "success");
   } catch (e) {
+    if (e.status === 409) {
+      loading(false);
+      const confirmed = confirm(
+        `Version ${activeVersion} has already been cleaned.\nReclean it? This will overwrite the existing result.`
+      );
+      if (confirmed) await runClean(true);
+      return;
+    }
     toast("Clean failed: " + e.message, "error");
+  } finally {
+    loading(false);
+  }
+}
+
+// ── Crop — draw-to-cut ────────────────────────────────────────────────
+const $cropOverlay    = document.getElementById("crop-overlay");
+const $cropDrawHint   = document.getElementById("crop-draw-hint");
+const $cropConfirmBar = document.getElementById("crop-confirm-bar");
+const $cropLabel      = document.getElementById("crop-confirm-label");
+const $btnCropApply   = document.getElementById("btn-crop-apply");
+const $btnCropFlip    = document.getElementById("btn-crop-flip");
+const $btnCropRedraw  = document.getElementById("btn-crop-redraw");
+const $btnCropCancel  = document.getElementById("btn-crop-cancel");
+
+let _cropPlane = null;   // { pointOrig, normalOrig } — current drawn plane
+let _drawStart = null;   // { x, y } in canvas-relative pixels
+
+function _syncOverlaySize() {
+  $cropOverlay.width  = $cropOverlay.offsetWidth;
+  $cropOverlay.height = $cropOverlay.offsetHeight;
+}
+
+function _drawCutLine(x1, y1, x2, y2) {
+  _syncOverlaySize();
+  const ctx = $cropOverlay.getContext("2d");
+  ctx.clearRect(0, 0, $cropOverlay.width, $cropOverlay.height);
+
+  // Dashed cut line
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.strokeStyle = "#4a7fc1";
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([7, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Endpoints
+  [[ x1, y1 ], [ x2, y2 ]].forEach(([x, y]) => {
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = "#4a7fc1";
+    ctx.fill();
+  });
+
+  // Arrowhead at end
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - 14 * Math.cos(angle - 0.4), y2 - 14 * Math.sin(angle - 0.4));
+  ctx.lineTo(x2 - 14 * Math.cos(angle + 0.4), y2 - 14 * Math.sin(angle + 0.4));
+  ctx.closePath();
+  ctx.fillStyle = "#4a7fc1";
+  ctx.fill();
+}
+
+function _clearOverlay() {
+  _syncOverlaySize();
+  $cropOverlay.getContext("2d").clearRect(0, 0, $cropOverlay.width, $cropOverlay.height);
+}
+
+function _enterDrawMode() {
+  _cropPlane = null;
+  _syncOverlaySize();
+  $cropOverlay.classList.add("draw-active");
+  $cropDrawHint.style.display = "block";
+  $cropConfirmBar.classList.add("visible");
+  $cropLabel.textContent = "Draw a line across the model to define the cut";
+  [$btnCropApply, $btnCropFlip, $btnCropRedraw].forEach((b) => (b.disabled = true));
+  getViewportA().controls.enabled = false;
+}
+
+function _exitDrawMode() {
+  $cropOverlay.classList.remove("draw-active");
+  $cropDrawHint.style.display = "none";
+  $cropConfirmBar.classList.remove("visible");
+  _clearOverlay();
+  _cropPlane = null;
+  _drawStart = null;
+  getViewportA().controls.enabled = true;
+  getViewportA().clearClipping();
+}
+
+// Mouse events on the overlay
+$cropOverlay.addEventListener("mousedown", (e) => {
+  const r = $cropOverlay.getBoundingClientRect();
+  _drawStart = { x: e.clientX - r.left, y: e.clientY - r.top };
+  _clearOverlay();
+  _cropPlane = null;
+  [$btnCropApply, $btnCropFlip, $btnCropRedraw].forEach((b) => (b.disabled = true));
+  $cropLabel.textContent = "Release to set the cut";
+  getViewportA().clearClipping();
+});
+
+$cropOverlay.addEventListener("mousemove", (e) => {
+  if (!_drawStart) return;
+  const r = $cropOverlay.getBoundingClientRect();
+  _drawCutLine(_drawStart.x, _drawStart.y, e.clientX - r.left, e.clientY - r.top);
+});
+
+$cropOverlay.addEventListener("mouseup", (e) => {
+  if (!_drawStart) return;
+  const r  = $cropOverlay.getBoundingClientRect();
+  const x1 = _drawStart.x, y1 = _drawStart.y;
+  const x2 = e.clientX - r.left, y2 = e.clientY - r.top;
+  _drawStart = null;
+
+  const dx = x2 - x1, dy = y2 - y1;
+  if (Math.sqrt(dx * dx + dy * dy) < 10) {
+    _clearOverlay();
+    $cropLabel.textContent = "Too short — draw a longer line";
+    return;
+  }
+
+  _drawCutLine(x1, y1, x2, y2);
+
+  const plane = getViewportA().screenLineToCropPlane(x1, y1, x2, y2);
+  if (!plane) { $cropLabel.textContent = "Load a model first"; return; }
+
+  _cropPlane = plane;
+  getViewportA().setClippingPlane(plane.pointOrig, plane.normalOrig);
+  $cropLabel.textContent = "Preview shown — apply or flip the cut";
+  [$btnCropApply, $btnCropFlip, $btnCropRedraw].forEach((b) => (b.disabled = false));
+});
+
+$btnCrop.onclick = () => {
+  if (!activeTwinId) return;
+  _enterDrawMode();
+};
+
+$btnCropFlip.onclick = () => {
+  if (!_cropPlane) return;
+  _cropPlane.normalOrig = _cropPlane.normalOrig.map((v) => -v);
+  getViewportA().setClippingPlane(_cropPlane.pointOrig, _cropPlane.normalOrig);
+};
+
+$btnCropRedraw.onclick = () => {
+  _clearOverlay();
+  _cropPlane = null;
+  _drawStart = null;
+  getViewportA().clearClipping();
+  [$btnCropApply, $btnCropFlip, $btnCropRedraw].forEach((b) => (b.disabled = true));
+  $cropLabel.textContent = "Draw a line across the model to define the cut";
+};
+
+$btnCropCancel.onclick = _exitDrawMode;
+
+$btnCropApply.onclick = async () => {
+  if (!_cropPlane || !activeTwinId || !activeVersion) return;
+  const plane = _cropPlane;  // save before _exitDrawMode nulls it
+  _exitDrawMode();
+  loading(true, "Cropping mesh…", "Processing geometry on server");
+  try {
+    await api(`/api/twins/${activeTwinId}/versions/${activeVersion}/crop`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: "plane",
+        point:  plane.pointOrig,
+        normal: plane.normalOrig,
+      }),
+    });
+    $variantSelect.value = "cropped";
+    const twin = await api(`/api/twins/${activeTwinId}`);
+    await refreshList();
+    populateVersions(twin);
+    await loadModel(twin, activeVersion, "cropped");
+    toast(`v${activeVersion} cropped`, "success");
+  } catch (e) {
+    toast("Crop failed: " + e.message, "error");
   } finally {
     loading(false);
   }
@@ -619,6 +806,7 @@ document.querySelectorAll(".modal-overlay").forEach((overlay) => {
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     document.querySelectorAll(".modal-overlay.open").forEach(closeModal);
+    if ($cropConfirmBar.classList.contains("visible")) _exitDrawMode();
   }
 });
 

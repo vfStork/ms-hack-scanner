@@ -110,6 +110,27 @@ def mark_cleaned(
     return twin
 
 
+def mark_cropped(
+    twin_id: str, version_num: int, cropped_mesh
+) -> Twin:
+    """Store a cropped mesh for a specific version."""
+    twin = _load(twin_id)
+    v = next((v for v in twin.versions if v.version == version_num), None)
+    if v is None:
+        raise ValueError(f"Version {version_num} not found for twin {twin_id}")
+
+    d = _twin_dir(twin_id)
+    v.cropped_ply = str(d / f"v{version_num}_cropped.ply")
+    v.cropped_glb = str(d / f"v{version_num}_cropped.glb")
+    v.is_cropped = True
+
+    export_ply(cropped_mesh, v.cropped_ply)
+    export_glb(cropped_mesh, v.cropped_glb)
+
+    _save(twin)
+    return twin
+
+
 def add_changelog(
     twin_id: str,
     version_a: int,

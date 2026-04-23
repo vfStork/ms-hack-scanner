@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from pipeline.ingest import load_scan
 from pipeline.clean import clean_mesh
+from pipeline.crop import crop_by_plane, crop_by_bbox
 from pipeline.diff import compute_diff, export_diff_glb
 from pipeline.export import export_glb
 from registry import store
@@ -25,6 +26,16 @@ class CompareRequest(BaseModel):
     version_a: int
     version_b: int
     use_cleaned: bool = False
+
+
+class CropRequest(BaseModel):
+    mode: str  # "plane" | "bbox"
+    # plane params
+    point: list[float] | None = None   # [x, y, z]
+    normal: list[float] | None = None  # [nx, ny, nz]
+    # bbox params
+    min_bound: list[float] | None = None  # [xmin, ymin, zmin]
+    max_bound: list[float] | None = None  # [xmax, ymax, zmax]
 
 
 # ── Upload ───────────────────────────────────────────────────────────
@@ -70,18 +81,62 @@ async def rescan(twin_id: str, file: UploadFile = File(...)):
 # ── Clean ────────────────────────────────────────────────────────────
 
 @router.post("/twins/{twin_id}/versions/{version}/clean")
-async def clean_version(twin_id: str, version: int):
-    """Trigger noise-removal on a specific version (on demand)."""
+async def clean_version(twin_id: str, version: int, force: bool = False):
+    """Trigger noise-removal on a specific version (on demand).
+
+    Pass `?force=true` to reclean a version that has already been cleaned.
+    Without it a 409 is returned so the caller can confirm before proceeding.
+    """
     twin = store.get_twin(twin_id)
     v = next((v for v in twin.versions if v.version == version), None)
     if v is None:
         raise HTTPException(404, f"Version {version} not found")
-    if v.is_cleaned:
-        raise HTTPException(400, "Already cleaned")
+    if v.is_cleaned and not force:
+        raise HTTPException(
+            409,
+            "This version has already been cleaned. "
+            "Pass ?force=true to reclean it.",
+        )
 
     raw_mesh = load_scan(v.raw_ply)
     cleaned = clean_mesh(raw_mesh)
     twin = store.mark_cleaned(twin_id, version, cleaned)
+    return twin.to_dict()
+
+
+# ── Crop ─────────────────────────────────────────────────────────────
+
+@router.post("/twins/{twin_id}/versions/{version}/crop")
+async def crop_version(twin_id: str, version: int, req: CropRequest):
+    """Crop a mesh by plane or axis-aligned bounding box.
+
+    Uses the cleaned mesh if available, otherwise the raw mesh.
+    Saves the result as cropped_ply / cropped_glb on the version.
+    """
+    twin = store.get_twin(twin_id)
+    v = next((v for v in twin.versions if v.version == version), None)
+    if v is None:
+        raise HTTPException(404, f"Version {version} not found")
+
+    source_path = v.clean_ply if v.is_cleaned else v.raw_ply
+    mesh = load_scan(source_path)
+
+    if req.mode == "plane":
+        if req.point is None or req.normal is None:
+            raise HTTPException(400, "mode='plane' requires 'point' and 'normal'")
+        if len(req.point) != 3 or len(req.normal) != 3:
+            raise HTTPException(400, "'point' and 'normal' must each have 3 values")
+        cropped = crop_by_plane(mesh, tuple(req.point), tuple(req.normal))
+    elif req.mode == "bbox":
+        if req.min_bound is None or req.max_bound is None:
+            raise HTTPException(400, "mode='bbox' requires 'min_bound' and 'max_bound'")
+        if len(req.min_bound) != 3 or len(req.max_bound) != 3:
+            raise HTTPException(400, "'min_bound' and 'max_bound' must each have 3 values")
+        cropped = crop_by_bbox(mesh, tuple(req.min_bound), tuple(req.max_bound))
+    else:
+        raise HTTPException(400, f"Unknown mode '{req.mode}'. Use 'plane' or 'bbox'.")
+
+    twin = store.mark_cropped(twin_id, version, cropped)
     return twin.to_dict()
 
 
@@ -181,6 +236,10 @@ async def get_model(twin_id: str, version: int, variant: str = Query("raw")):
         if not v.is_cleaned or not v.clean_glb:
             raise HTTPException(404, "Cleaned model not available")
         glb_path = v.clean_glb
+    elif variant == "cropped":
+        if not v.is_cropped or not v.cropped_glb:
+            raise HTTPException(404, "Cropped model not available")
+        glb_path = v.cropped_glb
     else:
         glb_path = v.raw_glb
 

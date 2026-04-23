@@ -14,6 +14,9 @@ class TwinVersion:
     clean_ply: Optional[str] = None
     clean_glb: Optional[str] = None
     is_cleaned: bool = False
+    cropped_ply: Optional[str] = None
+    cropped_glb: Optional[str] = None
+    is_cropped: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -24,6 +27,9 @@ class TwinVersion:
             "clean_ply": self.clean_ply,
             "clean_glb": self.clean_glb,
             "is_cleaned": self.is_cleaned,
+            "cropped_ply": self.cropped_ply,
+            "cropped_glb": self.cropped_glb,
+            "is_cropped": self.is_cropped,
         }
 
     @classmethod

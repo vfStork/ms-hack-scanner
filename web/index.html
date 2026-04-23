@@ -567,6 +567,35 @@
     .modal-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 4px; }
     .modal-actions button { padding: 9px 20px; font-size: 13px; }
 
+    /* ── Draw-to-crop overlay ──────────────────────────────────── */
+    #crop-overlay {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 10;
+    }
+    #crop-overlay.draw-active { pointer-events: all; cursor: crosshair; }
+    #crop-draw-hint {
+      display: none; position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(13,15,20,0.85); border: 1px solid var(--accent);
+      border-radius: 20px; padding: 7px 18px; font-size: 12px;
+      color: var(--text-secondary); white-space: nowrap; z-index: 11;
+      pointer-events: none;
+    }
+    #crop-draw-hint strong { color: var(--accent); }
+    #crop-confirm-bar {
+      display: none; position: absolute; bottom: 16px; left: 50%;
+      transform: translateX(-50%); z-index: 12;
+      background: var(--bg-elevated); border: 1px solid var(--border-light);
+      border-radius: 10px; padding: 10px 14px;
+      box-shadow: var(--shadow); gap: 8px; align-items: center;
+      white-space: nowrap;
+    }
+    #crop-confirm-bar.visible { display: flex; }
+    #crop-confirm-label { font-size: 12px; color: var(--text-muted); }
+    #crop-confirm-bar button { padding: 7px 14px; font-size: 12px; }
+    #btn-crop-cancel { padding: 7px 10px; border: none; background: none;
+      color: var(--text-muted); font-size: 16px; line-height: 1; }
+    #btn-crop-cancel:hover { color: var(--text-primary); background: none; }
+
     /* ── File input hidden ─────────────────────────────────────── */
     #file-input { display: none; }
   </style>
@@ -598,6 +627,7 @@
     <button id="btn-rescan" disabled title="Add a new scan version to the selected twin">Re-scan</button>
     <div class="tb-divider"></div>
     <button id="btn-clean"   disabled>Clean Mesh</button>
+    <button id="btn-crop"    disabled>✂ Draw Cut</button>
     <button id="btn-enrich"  disabled>Enrich AI</button>
     <button id="btn-compare" disabled>Compare…</button>
     <div class="spacer"></div>
@@ -608,6 +638,7 @@
     <select id="variant-select">
       <option value="raw">Raw</option>
       <option value="clean">Cleaned</option>
+      <option value="cropped">Cropped</option>
     </select>
     <button id="btn-info" class="icon-btn" title="Toggle details panel">ℹ Details</button>
   </div>
@@ -618,6 +649,9 @@
     <div id="vp-a-wrap" class="vp-wrap">
       <div class="vp-label" id="label-a">No model loaded</div>
       <canvas id="viewport"></canvas>
+      <!-- Draw-to-cut overlay -->
+      <canvas id="crop-overlay"></canvas>
+      <div id="crop-draw-hint">✂ Click and drag to draw a cut line — the <strong>left side</strong> of the line will be kept</div>
     </div>
 
     <div id="vp-b-wrap" class="vp-wrap" style="display:none">
@@ -629,6 +663,16 @@
         <div id="legend-bar"></div>
         <div class="legend-label">Min</div>
       </div>
+    </div>
+
+    <!-- Crop confirm bar -->
+    <div id="crop-confirm-bar">
+      <span id="crop-confirm-label">Draw a line to define the cut</span>
+      <div style="flex:1"></div>
+      <button id="btn-crop-flip"   disabled>⇄ Flip Side</button>
+      <button id="btn-crop-redraw" disabled>↩ Redraw</button>
+      <button id="btn-crop-apply"  disabled class="primary">✓ Apply Crop</button>
+      <button id="btn-crop-cancel">✕</button>
     </div>
 
     <!-- Drop zone overlay -->

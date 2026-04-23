@@ -42,6 +42,53 @@ def cmd_clean(args):
     print("Done")
 
 
+def cmd_crop(args):
+    from pipeline.ingest import load_scan
+    from pipeline.crop import crop_by_plane, crop_by_bbox
+    from registry.store import get_twin, mark_cropped
+
+    twin = get_twin(args.twin_id)
+    version = args.version or twin.versions[-1].version
+    v = next((v for v in twin.versions if v.version == version), None)
+    if v is None:
+        print(f"Version {version} not found"); sys.exit(1)
+
+    # Prefer cleaned mesh; fall back to raw
+    source_path = v.clean_ply if v.is_cleaned else v.raw_ply
+    print(f"Loading v{version} mesh from {source_path}…")
+    mesh = load_scan(source_path)
+
+    def _parse_vec(s, name):
+        try:
+            parts = [float(x) for x in s.split(",")]
+            if len(parts) != 3:
+                raise ValueError
+            return tuple(parts)
+        except ValueError:
+            print(f"--{name} must be three comma-separated floats, e.g. 0,0,1")
+            sys.exit(1)
+
+    if args.mode == "plane":
+        if not args.point or not args.normal:
+            print("--mode plane requires --point and --normal"); sys.exit(1)
+        point = _parse_vec(args.point, "point")
+        normal = _parse_vec(args.normal, "normal")
+        print(f"Cropping by plane: point={point}, normal={normal}…")
+        cropped = crop_by_plane(mesh, point, normal)
+    elif args.mode == "bbox":
+        if not args.min_bound or not args.max_bound:
+            print("--mode bbox requires --min-bound and --max-bound"); sys.exit(1)
+        min_b = _parse_vec(args.min_bound, "min-bound")
+        max_b = _parse_vec(args.max_bound, "max-bound")
+        print(f"Cropping by bbox: min={min_b}, max={max_b}…")
+        cropped = crop_by_bbox(mesh, min_b, max_b)
+    else:
+        print(f"Unknown mode: {args.mode}. Use 'plane' or 'bbox'"); sys.exit(1)
+
+    mark_cropped(args.twin_id, version, cropped)
+    print(f"Done — cropped mesh saved for v{version}")
+
+
 def cmd_compare(args):
     from pipeline.ingest import load_scan
     from pipeline.diff import compute_diff, export_diff_glb
@@ -134,6 +181,21 @@ def main():
     p.add_argument("twin_id")
     p.add_argument("--version", type=int, default=None, help="Version number (default: latest)")
 
+    # crop
+    p = sub.add_parser("crop", help="Crop a mesh by plane or bounding box")
+    p.add_argument("twin_id")
+    p.add_argument("--version", type=int, default=None, help="Version number (default: latest)")
+    p.add_argument("--mode", choices=["plane", "bbox"], required=True,
+                   help="Crop strategy: 'plane' or 'bbox'")
+    p.add_argument("--point", metavar="x,y,z",
+                   help="[plane] A point on the cutting plane")
+    p.add_argument("--normal", metavar="nx,ny,nz",
+                   help="[plane] Normal pointing toward the region to KEEP")
+    p.add_argument("--min-bound", metavar="x,y,z", dest="min_bound",
+                   help="[bbox] Minimum corner of the bounding box")
+    p.add_argument("--max-bound", metavar="x,y,z", dest="max_bound",
+                   help="[bbox] Maximum corner of the bounding box")
+
     # compare
     p = sub.add_parser("compare", help="Compare two versions of a twin")
     p.add_argument("twin_id")
@@ -162,6 +224,7 @@ def main():
         "upload": cmd_upload,
         "rescan": cmd_rescan,
         "clean": cmd_clean,
+        "crop": cmd_crop,
         "compare": cmd_compare,
         "enrich": cmd_enrich,
         "list": cmd_list,
