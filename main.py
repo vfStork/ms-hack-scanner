@@ -14,6 +14,21 @@ def cmd_upload(args):
     print(f"  Version 1 stored at: {twin.versions[0].raw_ply}")
 
 
+def cmd_delete(args):
+    from registry.store import get_twin, delete_twin
+
+    twin = get_twin(args.twin_id)
+    if not args.yes:
+        answer = input(
+            f'Delete twin "{twin.name}" ({twin.id}) and all its files? [y/N] '
+        )
+        if answer.strip().lower() not in ("y", "yes"):
+            print("Aborted.")
+            return
+    delete_twin(args.twin_id)
+    print(f"Deleted twin: {twin.id} ({twin.name})")
+
+
 def cmd_rescan(args):
     from registry.store import add_version
 
@@ -171,6 +186,11 @@ def main():
     p.add_argument("file", help="Path to .ply/.obj/.stl file")
     p.add_argument("--name", default="Untitled", help="Twin name")
 
+    # delete
+    p = sub.add_parser("delete", help="Delete a twin and all its associated files")
+    p.add_argument("twin_id")
+    p.add_argument("--yes", "-y", action="store_true", help="Skip confirmation prompt")
+
     # rescan
     p = sub.add_parser("rescan", help="Add a new scan version to an existing twin")
     p.add_argument("twin_id")
@@ -222,6 +242,7 @@ def main():
 
     commands = {
         "upload": cmd_upload,
+        "delete": cmd_delete,
         "rescan": cmd_rescan,
         "clean": cmd_clean,
         "crop": cmd_crop,
