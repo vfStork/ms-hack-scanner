@@ -162,6 +162,14 @@ def update_metadata(twin_id: str, metadata: dict) -> Twin:
     return twin
 
 
+def update_transform(twin_id: str, transform: dict) -> Twin:
+    """Update the twin's viewer transform (rotation + position offsets)."""
+    twin = _load(twin_id)
+    twin.transform.update(transform)
+    _save(twin)
+    return twin
+
+
 def _validated_twin_id(twin_id: str) -> str:
     """Validate twin id and return canonical UUID string."""
     try:

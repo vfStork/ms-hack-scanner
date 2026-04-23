@@ -140,6 +140,24 @@ async def crop_version(twin_id: str, version: int, req: CropRequest):
     return twin.to_dict()
 
 
+# ── Transform ────────────────────────────────────────────────────────
+
+class TransformRequest(BaseModel):
+    rot_x: float = 0
+    rot_y: float = 0
+    rot_z: float = 0
+    pos_x: float = 0
+    pos_y: float = 0
+    pos_z: float = 0
+
+
+@router.patch("/twins/{twin_id}/transform")
+async def update_transform(twin_id: str, req: TransformRequest):
+    """Update the viewer transform settings for a twin."""
+    twin = store.update_transform(twin_id, req.model_dump())
+    return twin.to_dict()
+
+
 # ── Enrich ───────────────────────────────────────────────────────────
 
 @router.post("/twins/{twin_id}/enrich")

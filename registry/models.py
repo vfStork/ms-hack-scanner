@@ -69,6 +69,10 @@ class Twin:
     versions: list[TwinVersion] = field(default_factory=list)
     changelog: list[ChangeEntry] = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
+    transform: dict = field(default_factory=lambda: {
+        "rot_x": 0, "rot_y": 0, "rot_z": 0,
+        "pos_x": 0, "pos_y": 0, "pos_z": 0,
+    })
 
     def to_dict(self) -> dict:
         return {
@@ -78,6 +82,7 @@ class Twin:
             "versions": [v.to_dict() for v in self.versions],
             "changelog": [c.to_dict() for c in self.changelog],
             "metadata": self.metadata,
+            "transform": self.transform,
         }
 
     @classmethod
@@ -89,6 +94,10 @@ class Twin:
             versions=[TwinVersion.from_dict(v) for v in d.get("versions", [])],
             changelog=[ChangeEntry.from_dict(c) for c in d.get("changelog", [])],
             metadata=d.get("metadata", {}),
+            transform=d.get("transform", {
+                "rot_x": 0, "rot_y": 0, "rot_z": 0,
+                "pos_x": 0, "pos_y": 0, "pos_z": 0,
+            }),
         )
 
     def latest_version(self) -> Optional[TwinVersion]:
