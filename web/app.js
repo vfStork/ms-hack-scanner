@@ -3,6 +3,7 @@ import { initViewports, showSingle, showSideBySide, setWireframe, getViewportA, 
 // ── State ─────────────────────────────────────────────────────────────
 let twins = [];
 let activeTwinId = null;
+let activeTwin = null;        // full twin object from API (includes transform)
 let activeVersion = null;
 let pendingFile = null;       // file waiting for name confirmation
 let wireframeOn = false;
@@ -145,6 +146,7 @@ async function selectTwin(id) {
   setEmptyState(false);
 
   const twin = await api(`/api/twins/${id}`);
+  activeTwin = twin;
   renderList();
   populateVersions(twin);
   populateInfo(twin);
@@ -269,7 +271,7 @@ async function loadModel(twin, version, variant) {
   $btnVpBToggle.style.display = "none";
   lastCompare = null;
   await showSingle(url);
-  resetSliders();
+  applyTwinTransform();
 }
 
 // ── Upload flow ───────────────────────────────────────────────────────
@@ -655,7 +657,7 @@ document.getElementById("modal-compare-confirm").onclick = async () => {
     $labelB.textContent = `v${vb} · heatmap`;
 
     await showSideBySide(urlA, result.heatmap_url);
-    resetSliders();
+    applyTwinTransform();
 
     // Store compare state so the toggle can switch between heatmap and model B
     lastCompare = { urlHeatmap: result.heatmap_url, urlModelB: urlB, va, vb, showingHeatmap: true };
@@ -767,6 +769,50 @@ function syncTransformFromSliders() {
   tpValues.posY.textContent = py.toFixed(2);
   tpValues.posZ.textContent = pz.toFixed(2);
   setPositionOffset(px, py, pz);
+
+  debouncedSaveTransform();
+}
+
+// Debounced save — waits 500ms after last slider change before calling API
+let _saveTimer = null;
+function debouncedSaveTransform() {
+  if (!activeTwinId) return;
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    const body = {
+      rot_x: parseFloat(tpSliders.rotX.value),
+      rot_y: parseFloat(tpSliders.rotY.value),
+      rot_z: parseFloat(tpSliders.rotZ.value),
+      pos_x: parseFloat(tpSliders.posX.value),
+      pos_y: parseFloat(tpSliders.posY.value),
+      pos_z: parseFloat(tpSliders.posZ.value),
+    };
+    fetch(`/api/twins/${activeTwinId}/transform`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).catch(() => {});
+  }, 500);
+}
+
+// Apply stored transform from the active twin to sliders + viewport
+function applyTwinTransform() {
+  const t = activeTwin?.transform;
+  if (!t) { resetSliders(); return; }
+  tpSliders.rotX.value = t.rot_x ?? 0;
+  tpSliders.rotY.value = t.rot_y ?? 0;
+  tpSliders.rotZ.value = t.rot_z ?? 0;
+  tpSliders.posX.value = t.pos_x ?? 0;
+  tpSliders.posY.value = t.pos_y ?? 0;
+  tpSliders.posZ.value = t.pos_z ?? 0;
+  tpValues.rotX.textContent = `${t.rot_x ?? 0}°`;
+  tpValues.rotY.textContent = `${t.rot_y ?? 0}°`;
+  tpValues.rotZ.textContent = `${t.rot_z ?? 0}°`;
+  tpValues.posX.textContent = (t.pos_x ?? 0).toFixed(2);
+  tpValues.posY.textContent = (t.pos_y ?? 0).toFixed(2);
+  tpValues.posZ.textContent = (t.pos_z ?? 0).toFixed(2);
+  setRotation(t.rot_x ?? 0, t.rot_y ?? 0, t.rot_z ?? 0);
+  setPositionOffset(t.pos_x ?? 0, t.pos_y ?? 0, t.pos_z ?? 0);
 }
 
 for (const slider of Object.values(tpSliders)) {
@@ -784,6 +830,7 @@ function resetSliders() {
   tpValues.posY.textContent = "0.00";
   tpValues.posZ.textContent = "0.00";
   resetTransform();
+  debouncedSaveTransform();
 }
 
 document.getElementById("tp-reset").onclick = resetSliders;
