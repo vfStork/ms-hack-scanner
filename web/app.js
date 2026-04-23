@@ -269,6 +269,7 @@ async function loadModel(twin, version, variant) {
   $btnVpBToggle.style.display = "none";
   lastCompare = null;
   await showSingle(url);
+  resetSliders();
 }
 
 // ── Upload flow ───────────────────────────────────────────────────────
@@ -654,6 +655,7 @@ document.getElementById("modal-compare-confirm").onclick = async () => {
     $labelB.textContent = `v${vb} · heatmap`;
 
     await showSideBySide(urlA, result.heatmap_url);
+    resetSliders();
 
     // Store compare state so the toggle can switch between heatmap and model B
     lastCompare = { urlHeatmap: result.heatmap_url, urlModelB: urlB, va, vb, showingHeatmap: true };
@@ -775,7 +777,12 @@ function resetSliders() {
   for (const slider of Object.values(tpSliders)) {
     slider.value = 0;
   }
-  syncTransformFromSliders();
+  tpValues.rotX.textContent = "0°";
+  tpValues.rotY.textContent = "0°";
+  tpValues.rotZ.textContent = "0°";
+  tpValues.posX.textContent = "0.00";
+  tpValues.posY.textContent = "0.00";
+  tpValues.posZ.textContent = "0.00";
   resetTransform();
 }
 

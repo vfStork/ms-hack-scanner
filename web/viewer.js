@@ -142,21 +142,6 @@ class Viewport {
     }
   }
 
-  rotateModel(axis, angleDeg) {
-    if (!this.pivotGroup) return;
-    const rad = (angleDeg * Math.PI) / 180;
-    switch (axis) {
-      case "x": this.pivotGroup.rotateX(rad); break;
-      case "y": this.pivotGroup.rotateY(rad); break;
-      case "z": this.pivotGroup.rotateZ(rad); break;
-    }
-  }
-
-  resetRotation() {
-    if (!this.pivotGroup) return;
-    this.pivotGroup.rotation.set(0, 0, 0);
-  }
-
   setRotation(xDeg, yDeg, zDeg) {
     if (!this.pivotGroup) return;
     this.pivotGroup.rotation.set(
@@ -289,16 +274,6 @@ export function getViewportB() { return vpB; }
 export function setWireframe(enabled) {
   vpA.setWireframe(enabled);
   vpB.setWireframe(enabled);
-}
-
-export function rotateModel(axis, angleDeg) {
-  vpA.rotateModel(axis, angleDeg);
-  vpB.rotateModel(axis, angleDeg);
-}
-
-export function resetRotation() {
-  vpA.resetRotation();
-  vpB.resetRotation();
 }
 
 export function setRotation(xDeg, yDeg, zDeg) {

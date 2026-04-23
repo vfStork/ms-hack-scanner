@@ -42,10 +42,12 @@ def export_glb(mesh: o3d.geometry.TriangleMesh, output_path: str) -> str:
     """
     t_mesh = _o3d_mesh_to_trimesh(mesh)
 
-    # Auto-correct Z-up → Y-up: rotate -90° around X when Z-extent > Y-extent
+    # Auto-correct Z-up → Y-up: rotate -90° around X only when Z is clearly the
+    # dominant axis (Z-extent > 1.5× Y-extent). A tighter margin avoids rotating
+    # valid Y-up meshes that happen to be deeper in Z than tall in Y (e.g. pipes).
     bounds = t_mesh.bounds  # [[min_x,min_y,min_z],[max_x,max_y,max_z]]
     extents = bounds[1] - bounds[0]
-    if extents[2] > extents[1]:
+    if extents[2] > 1.5 * extents[1]:
         rot = trimesh.transformations.rotation_matrix(-np.pi / 2, [1, 0, 0])
         t_mesh.apply_transform(rot)
 
